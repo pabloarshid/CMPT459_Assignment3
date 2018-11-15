@@ -1,0 +1,143 @@
+---
+title: Programming Assignment 2
+author: <Umar Arshid - 301245546>
+output:
+ html_document:
+ mathjax: default
+---
+```{r include=FALSE}
+
+library(caTools)
+require(caTools)
+install.packages("tree")
+library("tree")
+install.packages("caret")
+library("caret")
+install.packages("randomForest")
+library(randomForest)
+install.packages('pROC')
+library("pROC")
+install.packages('e1071', dependencies=TRUE)
+```
+## Task 1
+```{r}
+titanic <- read.csv(file="titanic3.csv",header=TRUE,sep=",");
+set.seed(1) 
+sample = sample.split(titanic, SplitRatio = .80)
+train = subset(titanic, sample == TRUE)
+test  = subset(titanic, sample == FALSE)
+
+ageavg <- mean(train$age, na.rm = TRUE)
+train$age <- replace(train$age,is.na(train$age),ageavg)
+
+ageavg <- mean(test$age, na.rm = TRUE)
+test$age <- replace(test$age,is.na(test$age),ageavg)
+
+pclassavg <- median(train$pclass, na.rm = TRUE)
+train$pclass <- replace(train$pclass,is.na(train$pclass),pclassavg)
+
+survivedavg <- median(train$survived, na.rm = TRUE)
+train$survived <- replace(train$survived,is.na(train$survived),survivedavg)
+
+sibspavg <- median(train$sibsp, na.rm = TRUE)
+train$sibsp <- replace(train$sibsp,is.na(train$sibsp),sibspavg)
+
+parchavg <- median(test$parch, na.rm = TRUE)
+train$parch <- replace(train$parch,is.na(train$parch),parchavg)
+
+fareavg <- median(train$fare, na.rm = TRUE)
+train$fare <- replace(train$fare,is.na(train$fare),fareavg)
+
+
+```
+ 
+##Task 1
+```{r}
+
+train$survived <- factor(train$survived)
+test$survived <- factor(test$survived)
+actual_results <- test$survived
+newtraining <- train[c("survived", "pclass", "sex", "age", "sibsp",
+"parch", "fare", "embarked")]
+
+newtesting <- test[c("survived", "pclass", "sex", "age", "sibsp",
+"parch", "fare", "embarked")]
+
+
+frmla = survived ~ pclass + sex + age + parch + fare +sibsp
+output.forest <- randomForest(frmla, data = new_train, importance=TRUE, ntree =100)
+output_predict <- predict(output.forest, new_test, type = "class")
+mean(actual_results == output_predict)
+output_predict_int <- as.integer(as.character(output_predict)) 
+
+rf.roc <- roc(actual_results, output_predict_int)
+plot(rf.roc)
+auc(rf.roc)
+```
+
+<report text for task 1 comes here>
+
+Accuracy = 80.49645%
+AUC = 0.7931
+
+best accuracy in Assignment 2 is  0.6382978723 vs ~.80 from random forests
+
+```{r}
+## Task 2
+importance(output.forest)
+varImpPlot(output.forest)
+```
+<report text for task 2 comes here>
+The Top 3 most important attributes are 
+1. Sex
+2. Fare
+3. Age
+
+Sex and age because women and children are always given priority in moments of evacuation and emergency
+
+fare and pclass are related in the fact that the more you pay, generally the higher passenger class youll have. And the people who payed the most would be given higher priority in evacuation moments because 
+A. higher the class the better the service around them
+B. better evacuation methods.
+
+```{r}
+##Task 3
+
+lbs_fun <- function(fit, ...) {
+        L <- length(fit$lambda)
+        x <- log(fit$lambda[L])
+        y <- fit$beta[, L]
+        labs <- names(y)
+        text(x, y, labels=labs, ...)
+        legend('topright', legend=labs, col=1:6, lty=1) # only 6 colors
+}
+x.train <- model.matrix(frmla, data=new_train)
+x.test <- model.matrix(frmla, data=new_test)
+glmnFit <- train(x = x.train, 
+             y = new_train$survived,
+             method = "glmnet")
+plot(glmnFit)
+```
+<report text for task 2 comes here>
+pclass, parch, and fare are three most important attribute
+
+```{r}
+##Task 4
+predictions <- predict(glmnFit, x.test)
+confusionMatrix(predictions, actual_results)
+output_prediction <- as.integer(as.character(predictions)) 
+Lr.roc <- roc(actual_results, output_prediction)
+plot(Lr.roc)
+auc(Lr.roc)
+
+```
+accuracy = .773
+AUC - .7572
+
+```{r}
+library(e1071)
+#Task 5
+tune.out = tune(svm, survived ~., data = new_train, kernel = "linear", ranges = list(cost = c(0.001, 
+    0.01, 0.1, 1, 5, 10, 100)))
+summary(tune.out) 
+
+```
