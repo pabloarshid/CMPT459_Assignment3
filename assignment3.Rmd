@@ -1,5 +1,5 @@
 ---
-title: Programming Assignment 2
+title: Programming Assignment 3
 author: <Umar Arshid - 301245546>
 output:
  html_document:
@@ -9,45 +9,17 @@ output:
 
 library(caTools)
 require(caTools)
-install.packages("tree")
 library("tree")
-install.packages("caret")
 library("caret")
-install.packages("randomForest")
 library(randomForest)
-install.packages('pROC')
 library("pROC")
 install.packages('e1071', dependencies=TRUE)
 ```
 ## Task 1
 ```{r}
-titanic <- read.csv(file="titanic3.csv",header=TRUE,sep=",");
 set.seed(1) 
-sample = sample.split(titanic, SplitRatio = .80)
-train = subset(titanic, sample == TRUE)
-test  = subset(titanic, sample == FALSE)
-
-ageavg <- mean(train$age, na.rm = TRUE)
-train$age <- replace(train$age,is.na(train$age),ageavg)
-
-ageavg <- mean(test$age, na.rm = TRUE)
-test$age <- replace(test$age,is.na(test$age),ageavg)
-
-pclassavg <- median(train$pclass, na.rm = TRUE)
-train$pclass <- replace(train$pclass,is.na(train$pclass),pclassavg)
-
-survivedavg <- median(train$survived, na.rm = TRUE)
-train$survived <- replace(train$survived,is.na(train$survived),survivedavg)
-
-sibspavg <- median(train$sibsp, na.rm = TRUE)
-train$sibsp <- replace(train$sibsp,is.na(train$sibsp),sibspavg)
-
-parchavg <- median(test$parch, na.rm = TRUE)
-train$parch <- replace(train$parch,is.na(train$parch),parchavg)
-
-fareavg <- median(train$fare, na.rm = TRUE)
-train$fare <- replace(train$fare,is.na(train$fare),fareavg)
-
+train <- read.csv(file="Titanic.Train.csv",header=TRUE,sep=",");
+test <- read.csv(file="Titanic.Test.csv",header=TRUE,sep=",");
 
 ```
  
@@ -57,16 +29,11 @@ train$fare <- replace(train$fare,is.na(train$fare),fareavg)
 train$survived <- factor(train$survived)
 test$survived <- factor(test$survived)
 actual_results <- test$survived
-newtraining <- train[c("survived", "pclass", "sex", "age", "sibsp",
-"parch", "fare", "embarked")]
-
-newtesting <- test[c("survived", "pclass", "sex", "age", "sibsp",
-"parch", "fare", "embarked")]
 
 
 frmla = survived ~ pclass + sex + age + parch + fare +sibsp
-output.forest <- randomForest(frmla, data = new_train, importance=TRUE, ntree =100)
-output_predict <- predict(output.forest, new_test, type = "class")
+output.forest <- randomForest(frmla, data = train, importance=TRUE, ntree =100)
+output_predict <- predict(output.forest, test, type = "class")
 mean(actual_results == output_predict)
 output_predict_int <- as.integer(as.character(output_predict)) 
 
@@ -77,8 +44,8 @@ auc(rf.roc)
 
 <report text for task 1 comes here>
 
-Accuracy = 80.49645%
-AUC = 0.7931
+Accuracy = 0.8396947
+AUC = 0.8208
 
 best accuracy in Assignment 2 is  0.6382978723 vs ~.80 from random forests
 
@@ -90,8 +57,8 @@ varImpPlot(output.forest)
 <report text for task 2 comes here>
 The Top 3 most important attributes are 
 1. Sex
-2. Fare
-3. Age
+2. Age
+3. Fare
 
 Sex and age because women and children are always given priority in moments of evacuation and emergency
 
@@ -102,22 +69,14 @@ B. better evacuation methods.
 ```{r}
 ##Task 3
 
-lbs_fun <- function(fit, ...) {
-        L <- length(fit$lambda)
-        x <- log(fit$lambda[L])
-        y <- fit$beta[, L]
-        labs <- names(y)
-        text(x, y, labels=labs, ...)
-        legend('topright', legend=labs, col=1:6, lty=1) # only 6 colors
-}
-x.train <- model.matrix(frmla, data=new_train)
-x.test <- model.matrix(frmla, data=new_test)
+x.train <- model.matrix(frmla, data=train)
+x.test <- model.matrix(frmla, data=test)
 glmnFit <- train(x = x.train, 
-             y = new_train$survived,
+             y = train$survived,
              method = "glmnet")
 plot(glmnFit)
 ```
-<report text for task 2 comes here>
+<report text for task 3 comes here>
 pclass, parch, and fare are three most important attribute
 
 ```{r}
@@ -130,14 +89,53 @@ plot(Lr.roc)
 auc(Lr.roc)
 
 ```
-accuracy = .773
-AUC - .7572
+<report text for task 4 comes here>
+accuracy = 0.8092  
+AUC - 0.7887
 
 ```{r}
 library(e1071)
 #Task 5
-tune.out = tune(svm, survived ~., data = new_train, kernel = "linear", ranges = list(cost = c(0.001, 
-    0.01, 0.1, 1, 5, 10, 100)))
-summary(tune.out) 
+linear_tune <- tune(svm, survived ~., data=test, kernel="linear")
+radial_tune <- tune(svm, survived ~., data=test, kernel="radial")
+linear_tune$best.model
+radial_tune$best.model
 
 ```
+<report text for task 5 comes here>
+Best parameters for linear svm is:
+  SVM-Type:  C-classification 
+  SVM-Kernel:  linear 
+       cost:  1 
+      gamma:  0.1428571 
+BEst Parameters for radial svm is
+Parameters:
+   SVM-Type:  C-classification 
+  SVM-Kernel:  radial 
+       cost:  1 
+      gamma:  0.1428571 
+      
+```{r}
+  library(e1071)
+  results.linear <- predict(linear_tune$best.model, test)
+  results.radial <- predict(radial_tune$best.model, test)
+  svmlin.roc <- roc(actual_results, as.numeric(results.linear))
+  svmrad.roc <- roc(actual_results, as.numeric(results.radial))
+  
+  
+  confusionMatrix(results.linear, actual_results)
+  confusionMatrix(results.radial, actual_results)
+  
+  plot(svmlin.roc)
+  auc(svmlin.roc)
+  plot(svmrad.roc)
+  auc(svmrad.roc)
+
+  
+```
+<report text for task 6 comes here>
+Linear acuracy = 0.8015 
+Linear Area under the curve: 0.7842
+Radial accuracy  = 0.8321 
+Radial Area under the curve: 0.8145
+
